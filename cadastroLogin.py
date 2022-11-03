@@ -3,6 +3,8 @@ from mysql.connector import Error
 import PySimpleGUI as sg
 
 loginCheck = False
+countFCadastro = 0
+
 
 try:
     cnx = mysql.connector.connect(user='root',
@@ -58,6 +60,26 @@ def makeWindow3(theme='Dark'):
 janela1, janela2, janela3 = makeWindow1('Dark'), None, None
 
 
+def read_query(cnx, query):
+    cursor = cnx.cursor()
+    result = None
+    try:
+        cursor.execute(query)
+        result = cursor.fetchall()
+        return result
+    except Error as err:
+        print(f"Error: '{err}'")
+
+
+puxarDados = """
+SELECT *
+FROM tbl_users;
+"""
+
+cnx = mysql.connector.connect(user='root',
+                              database='pysimpleguitest',
+                              charset='utf8mb4')
+results = read_query(cnx, puxarDados)
 
 while True:
     window, event, values = sg.read_all_windows()
@@ -73,61 +95,61 @@ while True:
         if login == '' or senha == '' or email == '':
             sg.popup('Falha ao cadastrar, por favor preencha todos os campos! ')
         else:
-            sg.popup('Cadastro realizado com sucesso!')
+            countSCadastro = 0
+            for result in results:
+                if login == result[1] or email == result[3]:
+                    countFCadastro = countFCadastro + 1
+                else:
+                    countSCadastro = countSCadastro + 1
 
-            try:
-                cnx = mysql.connector.connect(user='root',
-                                              database='pysimpleguitest')
 
-                declaracao = "INSERT INTO tbl_users (login, senha, email) VALUES (%s, %s, %s);"
 
-                cursor = cnx.cursor()
-                cursor.execute(declaracao,(login,senha,email,))
-                cnx.commit()
-                print(cursor.rowcount, "registros inseridos na tabela!")
-                cursor.close()
-            except Error as erro:
-                print(f'Falha ao inserir danos no MySQL, o erro foi:> {erro}')
-            finally:
-                if cnx.is_connected():
-                    cnx.close()
-                    print('Conexão ao MySQL finalizada com sucesso!')
-                    break
+            if countSCadastro == len(results):
+                sg.popup('Cadastro realizado com sucesso!')
+                try:
+                    cnx = mysql.connector.connect(user='root',
+                                                  database='pysimpleguitest')
+
+                    declaracao = "INSERT INTO tbl_users (login, senha, email) VALUES (%s, %s, %s);"
+
+                    cursor = cnx.cursor()
+                    cursor.execute(declaracao, (login, senha, email,))
+                    cnx.commit()
+                    print(cursor.rowcount, "registros inseridos na tabela!")
+                    cursor.close()
+                except Error as erro:
+                    print(f'Falha ao inserir danos no MySQL, o erro foi:> {erro}')
+                finally:
+                    if cnx.is_connected():
+                        cnx.close()
+                        print('Conexão ao MySQL finalizada com sucesso!')
+                        break
+            else:
+                sg.popup('Login ou Email já cadastrado!')
 
     if event == 'Já tenho uma conta':
         janela1.hide()
         janela2 = makeWindow2()
 
     if window == janela2 and event == 'Logar':
-        def read_query(cnx, query):
-            cursor = cnx.cursor()
-            result = None
-            try:
-                cursor.execute(query)
-                result = cursor.fetchall()
-                return result
-            except Error as err:
-                print(f"Error: '{err}'")
-
-
-        puxarDados = """
-        SELECT *
-        FROM tbl_users;
-        """
-
-        cnx = mysql.connector.connect(user='root',
-                                      database='pysimpleguitest',
-                                      charset='utf8mb4')
-        results = read_query(cnx, puxarDados)
-
+        countSucess = 0
+        countFail = 0
         for result in results:
             if values['-CLOGIN-'] == result[1] and values['-CSENHA-'] == result[2]:
-                sg.popup('Login realizado com sucesso!')
-                nameUser = values['-CLOGIN-']
+                countSucess = countSucess + 1
                 loginCheck = True
+                if countSucess == 1:
+                    sg.popup('Login realizado com sucesso!')
+                    nameUser = values['-CLOGIN-']
+                    break
             else:
-                sg.popup('Dados invalidos!')
-                loginCheck = False
+                countFail = countFail + 1
+                if countFail == len(results):
+                    sg.popup('Dados invalidos!')
+
+    if window == janela2 and event == 'Voltar':
+        janela2.hide()
+        janela1.un_hide()
 
     if loginCheck == True:
         janela2.hide()
